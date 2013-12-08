@@ -15,5 +15,7 @@ struct rule {
     struct rule* next; //pointer to the next rule in the list
 };
 
-struct rule *parse_rules();
+void print_rules(struct rule *rule_chain);
+void parse_rules();
+rule_type_t get_firewall_action(struct rule *rule_chain, char* src_iface, char* dst_iface, u_char* saddr, u_char* dadder, u_short src_port, u_short dst_port);
 #endif

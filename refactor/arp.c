@@ -17,6 +17,28 @@
 #include "packets.h"
 #include "arp.h"
 
+struct interface* get_interface(u_char* ip){
+    //get the interface to send over
+    struct interfaces_map *cur_imap, *tmp; 
+    struct interface *channel=NULL;
+    HASH_ITER(hh, i_dict, cur_imap, tmp){
+        u_char i_ip[4];
+        memcpy(&i_ip, cur_imap->ip_addr, 4);
+        u_char d_ip[4];
+        memcpy(&d_ip, ip, 4);
+        u_char sub[4];
+        memcpy(&sub, &cur_imap->iface->subnet,4);
+        int send = ip_in_subnet(d_ip,sub,i_ip);
+        if(send ==1){
+            struct interface* iface_val = malloc(sizeof(struct interface));
+            memcpy(iface_val, cur_imap->iface, sizeof(struct interface));
+            printf("\nDest interface Name: %s\n", iface_val->name);
+            return iface_val;
+        }
+    }
+    return NULL;
+}
+
 void add_to_arp_table(u_char* ip, u_char* dest_mac){
     printf("ADD to arp destination ip:\n");
     for (int j=0; j< 6; j++){
@@ -305,7 +327,7 @@ void handle_arp_packet(struct arp_header * arp_h,struct interface* iface,const s
 void send_packet(struct arp_entry* a_ent, u_char *data, const struct pcap_pkthdr *hdr){
     u_int offset = 0;
 
-    fprintf("Sending a packet onto the %s interface\n", a_ent->iface.name);
+    printf("Sending a packet onto the %s interface\n", a_ent->iface.name);
     // Get the ethernet header which is the start of the array.
     struct eth_header *h_ether = (struct eth_header *) data;
     
@@ -331,7 +353,7 @@ void send_packet(struct arp_entry* a_ent, u_char *data, const struct pcap_pkthdr
 
 
     while(pcap_inject(a_ent->iface.pcap, data, hdr->caplen)==1){
-        printf(stdout,"Error, trying again..");
+        printf("Error, trying again..\n");
     }
     //process_packet_dump((u_char*)fo, hdr, data);
 }

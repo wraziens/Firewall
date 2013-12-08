@@ -68,13 +68,15 @@ void construct_arp(struct interface *iface, u_char *dest_ip);
 
 void send_packet(struct arp_entry* a_ent, u_char *data, const struct pcap_pkthdr *hdr);
 
+struct interface* get_interface(u_char* ip);
 /*GLOABAL VARIABLE DECLARATIONS*/
 
 //Global unresolved hash
-struct unresolved* waiting = NULL;
+struct unresolved* waiting;
 //Global arp table to store arp entries
-struct arp_table* arp_tbl = NULL;
+struct arp_table* arp_tbl;
 
+struct rule *rule_list;
 /* END GLOBAL DECLARATIONS */
 
 

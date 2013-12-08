@@ -16,6 +16,8 @@
 #include <string.h>
 #include "packets.h"
 #include "arp.h"
+#include "rules.h"
+#include "reject.h"
 
 #define TCP_PROTO_ID 6
 #define ICMP_PROTO_ID 1
@@ -25,9 +27,9 @@
 pcap_dumper_t* fo = NULL;
 pcap_t* fi, *fo2= NULL;
 
-void process_packet_dump(u_char *dumpfile, const struct pcap_pkthdr *hdr,const u_char *data) {
-    pcap_dump(dumpfile, hdr, data);
-}
+//void process_packet_dump(u_char *dumpfile, const struct pcap_pkthdr *hdr,const u_char *data) {
+ //   pcap_dump(dumpfile, hdr, data);
+//}
 
 //Processes a packet read from an interface
 void process_packet_inject(struct interface* iface,const struct pcap_pkthdr *hdr, const u_char *data) {
@@ -60,10 +62,73 @@ void process_packet_inject(struct interface* iface,const struct pcap_pkthdr *hdr
         return;
     }
 
-    // IP header is next (after the size of h_ether)
+    // IP header is next after the size of h_ether)
     offset += sizeof(struct eth_header);
     struct ip_header *h_ip = (struct ip_header *) (data + offset);
+    offset += (h_ip->ver_ihl & 0x0f) * 4;
+
+    u_char * data8 = (data + offset);
     print_ip_address(h_ip);
+
+
+    printf("\n\nProtocol Type: %d\n\n", h_ip->proto);
+    
+    //handle ICMP packets
+    if(h_ip->proto ==ICMP_PROTO_ID){
+        struct icmp_header* h_icmp = (struct icmp_header *) (data + offset);
+    //handle TCP packets
+    }else if(h_ip->proto == TCP_PROTO_ID){
+        struct tcp_header* h_tcp = (struct tcp_header *)(data + offset);
+        printf("\nsrc_port %d\n", ntohs(h_tcp->src_port)); 
+        printf("\ndst_port %d\n", ntohs(h_tcp->dst_port));
+        struct interface* i = get_interface(h_ip->daddr);
+        char* sadr = ip_string(h_ip->saddr);
+        char* dadr = ip_string(h_ip->daddr);
+        printf("SADDR2: %s\n",sadr); 
+
+        rule_type_t rt = get_firewall_action(rule_list,iface->name,i->name, sadr, dadr, ntohs(h_tcp->src_port), ntohs(h_tcp->dst_port));
+        //free memory no longer needed.
+        free(i);
+        free(sadr);
+        free(dadr);
+        printf("\n\nRule Type: %i\n", rt);
+
+    //handle UPD packets
+    }else if(h_ip-> proto == UDP_PROTO_ID){
+        printf("UDP\n");
+        struct udp_header* h_udp = (struct udp_header *)(data+offset);
+        printf("\nsrc_port %d\n", ntohs(h_udp->src_port)); 
+        printf("\ndst_port %d\n", ntohs(h_udp->dst_port));
+
+        struct interface* i = get_interface(h_ip->daddr);
+        char* sadr = ip_string(h_ip->saddr);
+        char* dadr = ip_string(h_ip->daddr);
+        printf("SADDR2: %s\n",sadr); 
+
+        rule_type_t rt = get_firewall_action(rule_list,iface->name,i->name, sadr, dadr, ntohs(h_udp->src_port), ntohs(h_udp->dst_port));
+        //free memory no longer needed.
+        free(i);
+        free(sadr);
+        free(dadr);
+        printf("\n\nRule Type: %i\n", rt);
+        if(rt == REJECT){
+            printf("Rejected. Sending ICMP message.\n");
+            printf("ip chck: %i\n", h_ip->crc);
+            //h_ip->crc= 0;
+            u_short v= checksum(h_ip,ntohs(h_ip->tlen));
+            printf("Calculated: %i\n", v);
+            icmp_reject(iface, h_ip, h_ether, data8);
+            return;
+        }else if(rt == BLOCK){
+            printf("Blocked. Dropping the packet.\n");
+        }else if(rt==PASS){
+            printf("Pass, the packet is allowed through\n"); 
+        }
+    }else{
+        //If not one of the above mentioned packets, we do nothing.
+        return;
+    }
+
     //check to see if dest mac is in ARP table 
     struct arp_table* atble= NULL;
     HASH_FIND(hh, arp_tbl, h_ip->daddr, sizeof(u_char) * 4, atble);
@@ -105,6 +170,11 @@ void process_packet_inject(struct interface* iface,const struct pcap_pkthdr *hdr
 }
 
 int main(int argc, char **argv) {
+    //intiialize globals
+    i_dict = NULL;    
+    waiting = NULL;
+    arp_tbl = NULL;
+
     char err[PCAP_ERRBUF_SIZE];
     pcap_t *pch;
 
@@ -112,6 +182,7 @@ int main(int argc, char **argv) {
     if (argc < 2) {
         printf("To hookup to interfaces:  ./firewall interface_1  interface_2 [interface_3, ...] \n");
         printf("To play a pcap file: ./firewall file.pcap\n");
+      
         return 0;
     }
 
@@ -122,7 +193,6 @@ int main(int argc, char **argv) {
     int file_in = 0;
     int file_out = 0;
 
-    //open pcap file for writing
     for (int x=1; x<argc; x++){
         printf("%s\n", argv[x]);  
         printf("%i\n", strcmp(argv[x], "-fileout"));
@@ -163,18 +233,12 @@ int main(int argc, char **argv) {
     struct interfaces_map *current_iface, *iface_tmp;
     const u_char* pkt_data=NULL;
     struct pcap_pkthdr hdr;
-    
-    //play up to 256 packets from the file on the interfaces
-    //listed
-    //if(fi != NULL){
-     //   int i = 0;
-     //   while(i<256){
-     //       pkt_data = pcap_next(fi, &hdr);
-     //       if(pkt_data){
-     //           process_packet_inject(NULL, &hdr, pkt_data);
-     //       }
-     //   }
-   // }
+   
+    //Read in the rules and populate the 
+    //rules list
+    rule_list = malloc(sizeof(struct rule));
+    parse_rules(&rule_list);
+    print_rules(rule_list);
     
     //indefinately read from the interfaces 
     while(1){

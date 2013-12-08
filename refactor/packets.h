@@ -86,8 +86,9 @@ struct icmp_header {
     u_char type;
     u_char code;
     u_short checksum;
-   
-    u_int rest;
+
+    u_short unused;
+    u_short mtu;
 };
 
 struct arp_header {
@@ -122,15 +123,16 @@ struct interfaces_map {
 };
 
 
-//formerly process
 void print_ip_address(struct ip_header* h_ip);
+
+char* ip_string(char* ip_addr);
 
 int ip_in_subnet(u_char* ip, u_char* subnet, u_char* base_addr);
 
 /*GLOBAL VARIABLE DECLARATIONS*/
 
 //Global hash map to store all interfaces
-struct interfaces_map* i_dict = NULL;
+struct interfaces_map* i_dict;
 
 /*END GLOBAL VARIABLE DECLARATIONS*/
 
