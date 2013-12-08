@@ -102,12 +102,10 @@ void icmp_reject(struct interface *iface, struct ip_header* ip_hdr, u_char *data
     memcpy(packet+sizeof(struct eth_header) +sizeof(struct ip_header), total_pack, sizeof(struct icmp_header) + ip_len+8);
     //close(s);
 
-    printf("sending the packet over the wire..%s\n", iface->name);
     //send the packet over the wire
     if(pcap_inject(iface->pcap, packet, sizeof(struct eth_header)+sizeof(struct ip_header)+ip_len + 8 + sizeof(struct icmp_header))==-1){
         pcap_perror(iface->pcap, 0);
     }
-
     //Free memory
     free(total_pack);
     free(packet);
@@ -166,7 +164,7 @@ void tcp_reset(struct interface *iface, struct ip_header* ip_hdr, struct tcp_hea
 
     h_ip.crc = checksum((void*)&h_ip,20);
 
-    //combine the ICMP, IP, and Ethernet headers
+    //combine the TCP, IP, and Ethernet headers
     u_char *packet = malloc(sizeof(struct eth_header)+sizeof(struct tcp_header) + sizeof(struct ip_header)); 
     
     memcpy(packet, eth_hdr, sizeof(struct eth_header));

@@ -369,3 +369,18 @@ int ip_in_subnet(u_char* ip, u_char* subnet, u_char* base_addr) {
 }
 
 
+//Prints the current state of the ARP table
+void print_arp_table(){
+    printf("\n\n=====================================\n");
+    //print ARP table
+    struct arp_table *tbl, *tmp;
+    HASH_ITER(hh,arp_tbl,tbl, tmp){
+        printf("ARP IP: %i.%i.%i.%i\n",tbl->dest_ip[0], tbl->dest_ip[1], tbl->dest_ip[2],tbl->dest_ip[3]);
+        for(int j=0; j<6; j++){
+            printf("%.2X", (u_char)tbl->arp_ent->dest_mac[j]);
+        }
+        printf("\n");
+    }
+
+}
+
