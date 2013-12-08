@@ -5,4 +5,4 @@ FILES=read.c arp.c packets.c rules.c reject.c
 OUTPUT=read
 
 make :
-	${GXX} ${FILES} ${FLAGS} -o ${OUTPUT}
+	${GCC} ${FILES} ${FLAGS} -o ${OUTPUT}

@@ -17,7 +17,7 @@
 #include <string.h>
 #include "packets.h"
 
-void icmp_reject(struct interface *iface, struct ip_header* ip_hdr, struct eth_header* eth_hdr, u_char* data8);
+void icmp_reject(struct interface *iface, struct ip_header* ip_hdr, struct udp_header *udp_hdr, struct eth_header* eth_hdr);
 
 
 

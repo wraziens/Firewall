@@ -28,7 +28,7 @@ u_short checksum(void* ip_hdr, int count){
     return (~sum);
 }
 //end Similar to http://tools.ietf.org/html/rfc1071
-void icmp_reject(struct interface *iface, struct ip_header* ip_hdr, struct eth_header* eth_hdr, u_char* data8){
+void icmp_reject(struct interface *iface, struct ip_header* ip_hdr, struct udp_header *udp_hdr, struct eth_header *eth_hdr){
 
     //construct the ethernet header
     struct eth_header h_ether;
@@ -53,51 +53,57 @@ void icmp_reject(struct interface *iface, struct ip_header* ip_hdr, struct eth_h
  
     //construct the ICMP header
     struct icmp_header icmp_hdr;
-    icmp_hdr.type = htons(3);
-    icmp_hdr.code = htons(3);
-    icmp_hdr.checksum = htons(0);
+    icmp_hdr.type = 3;
+    icmp_hdr.code = 3;
+    icmp_hdr.checksum = 0;
     icmp_hdr.unused = 0;
     icmp_hdr.mtu = 0;
 
     int ip_len = (ip_hdr->ver_ihl & 0x0f) * 4;
 
+    printf("IPLEN: %i\n", ip_len);
     u_char* total_pack = malloc(sizeof(struct icmp_header) + ip_len + 8);
 
     memcpy(total_pack, &icmp_hdr, sizeof(struct icmp_header));
     memcpy(total_pack+sizeof(struct icmp_header), ip_hdr, ip_len);
     
-    printf("POST TESTER22:%d\n",ntohs(*(u_short*)data8));
-    memcpy(total_pack+sizeof(struct icmp_header)+ip_len, (void*)data8, 8);
+    memcpy(total_pack+sizeof(struct icmp_header)+ip_len, udp_hdr, 8);
+    
+    icmp_hdr.checksum = checksum((void*)total_pack, sizeof(struct icmp_header)+ip_len+8);
+    memcpy(total_pack, &icmp_hdr, sizeof(struct icmp_header));
 
-    u_short crc = checksum((void*)&icmp_hdr, sizeof(struct icmp_header) + ip_len + 8);
-    icmp_hdr.checksum = crc;
 
     //construct the IP header
     struct ip_header h_ip;
     h_ip.proto=htons(ICMP_PROTO_ID);
-    h_ip.ver_ihl=4<<4 & 5;
+    h_ip.ver_ihl=(4<<4) + 5;
+    printf("LENGTH: %d\n", (h_ip.ver_ihl & 0x0f) *4); 
     h_ip.tos = 0;
-    h_ip.tlen = sizeof(struct icmp_header) + ip_len+8 + 20;
-    h_ip.identification = 0;
     h_ip.flags_fo = 0;
+    h_ip.tlen = htons(sizeof(struct icmp_header) + ip_len + 8 + 20);
+    printf("IP TLEN: %i", sizeof(struct icmp_header) + ip_len + 8 + 20);
+    h_ip.identification = 0;
     h_ip.ttl = 32;
     h_ip.proto = ICMP_PROTO_ID;
     h_ip.crc = 0;
-    memcpy(&h_ip.saddr, ip_hdr->daddr, 4);
-    memcpy(&h_ip.daddr, ip_hdr->saddr,4);
+    memcpy(h_ip.saddr, ip_hdr->daddr, 4);
+    memcpy(h_ip.daddr, ip_hdr->saddr,4);
 
     h_ip.crc = checksum((void*)&h_ip,20);
 
+
     //combine the ICMP, IP, and Ethernet headers
     u_char *packet = malloc(sizeof(struct eth_header)+sizeof(struct icmp_header) + sizeof(struct ip_header) + ip_len +8); 
+    
     memcpy(packet, eth_hdr, sizeof(struct eth_header));
 
-    memcpy(packet+sizeof(struct eth_header), &total_pack, sizeof(struct ip_header) + ip_len +8);
-    memcpy(packet+sizeof(struct ip_header)+ip_len +8 , &icmp_hdr, sizeof(struct icmp_header));
+    memcpy(packet+sizeof(struct eth_header), &h_ip, sizeof(struct ip_header));
+    memcpy(packet+sizeof(struct eth_header) +sizeof(struct ip_header), total_pack, sizeof(struct icmp_header) + ip_len+8);
     //close(s);
 
-    //send the packet over the wire.
-    if(pcap_inject(iface->pcap, packet, sizeof(struct eth_header)+sizeof(struct ip_header) + sizeof(struct icmp_header))==-1){
+    printf("sending the packet over the wire..%s\n", iface->name);
+    //send the packet over the wire
+    if(pcap_inject(iface->pcap, packet, sizeof(struct eth_header)+sizeof(struct ip_header)+ip_len + 8 + sizeof(struct icmp_header))==-1){
         pcap_perror(iface->pcap, 0);
     }
 }

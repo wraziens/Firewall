@@ -36,7 +36,8 @@ void process_packet_inject(struct interface* iface,const struct pcap_pkthdr *hdr
     u_int offset = 0;
 
     // Get the ethernet header which is the start of the array.
-    struct eth_header *h_ether = (struct eth_header *) data;
+    struct eth_header *h_ether = malloc(sizeof(struct eth_header));
+    memcpy(h_ether,(struct eth_header *) data, sizeof(struct eth_header));
     
     //check to see if this is an ARP packet
     if (h_ether->type == htons(0x0806)) {
@@ -64,17 +65,19 @@ void process_packet_inject(struct interface* iface,const struct pcap_pkthdr *hdr
 
     // IP header is next after the size of h_ether)
     offset += sizeof(struct eth_header);
-    struct ip_header *h_ip = (struct ip_header *) (data + offset);
+    struct ip_header *h_ip = malloc(sizeof(struct ip_header)); 
+    memcpy(h_ip, (struct ip_header *) (data + offset), sizeof(struct ip_header));
     offset += (h_ip->ver_ihl & 0x0f) * 4;
 
-    u_char data8[8];//= malloc(sizeof(u_char)*8);
+    /*
+    u_char* data8 = malloc(8);
     printf("OFFSET: %d\n",(h_ip->ver_ihl & 0x0f) * 4);
-    memcpy(&data8, (u_char*)data+offset, 8); 
+    memcpy(data8, (u_char*)data+offset, 8); 
     printf("TOTAL LEN:%d\n",ntohs(h_ip->tlen));
     print_ip_address(h_ip);
     printf("POST TESTER:%d\n",ntohs(*(u_short*)(data+offset)));
     printf("POST TESTER2:%d\n",ntohs(*(u_short*)data8));
-
+    */
 
     printf("\n\nProtocol Type: %d\n\n", h_ip->proto);
     
@@ -101,7 +104,8 @@ void process_packet_inject(struct interface* iface,const struct pcap_pkthdr *hdr
     //handle UPD packets
     }else if(h_ip-> proto == UDP_PROTO_ID){
         printf("UDP\n");
-        struct udp_header* h_udp = (struct udp_header *)(data+offset);
+        struct udp_header* h_udp =  malloc(sizeof(struct udp_header));
+        memcpy(h_udp,(struct udp_header *)(data+offset), sizeof(struct udp_header));
         printf("\nsrc_port %d\n", ntohs(h_udp->src_port)); 
         printf("\ndst_port %d\n", ntohs(h_udp->dst_port));
 
@@ -112,9 +116,9 @@ void process_packet_inject(struct interface* iface,const struct pcap_pkthdr *hdr
 
         rule_type_t rt = get_firewall_action(rule_list,iface->name,i->name, sadr, dadr, ntohs(h_udp->src_port), ntohs(h_udp->dst_port));
         //free memory no longer needed.
-        free(i);
-        free(sadr);
-        free(dadr);
+        //free(i);
+        //free(sadr);
+        //free(dadr);
         printf("\n\nRule Type: %i\n", rt);
         if(rt == REJECT){
             printf("Rejected. Sending ICMP message.\n");
@@ -122,7 +126,7 @@ void process_packet_inject(struct interface* iface,const struct pcap_pkthdr *hdr
             //h_ip->crc= 0;
             u_short v= checksum(h_ip,ntohs(h_ip->tlen));
             printf("Calculated: %i\n", v);
-            icmp_reject(iface, h_ip, h_ether, data8);
+            icmp_reject(iface, h_ip, h_udp, h_ether);
             return;
         }else if(rt == BLOCK){
             printf("Blocked. Dropping the packet.\n");
