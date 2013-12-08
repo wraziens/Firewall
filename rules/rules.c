@@ -7,10 +7,11 @@
 
 // Reads the rules from the file 'rules.conf'
 // and returns a rule struct
-void parse_rules(struct rule* rule_val){
+void parse_rules(struct rule** rule_vals){
     FILE *fh = fopen("rules.conf", "rt");
     char line[MAX_LINE_LEN];
-
+     
+    struct rule *rule_val = *rule_vals;
     struct rule *r = rule_val;
     struct rule *last = NULL;
     while (fgets(line, MAX_LINE_LEN, fh) != NULL) {
@@ -84,10 +85,9 @@ void parse_rules(struct rule* rule_val){
             r = malloc(sizeof(struct rule));
         }
     }
-//    r=last;
-    memcpy(rule_val, last, sizeof(struct rule));
-    //rule_val = last;
-    print_rules(rule_val);
+    r=last;
+    *rule_vals=r;
+    //print_rules(rule_vals);
 }
 
 //Prints our the rules in the list rule_chain
@@ -114,3 +114,47 @@ void print_all_rules(struct rule *rule_chain){
     }while((rule_chain = rule_chain->next) != NULL);
 }
 
+//Returns 1 if the rule matches, otherwise 0.
+int match(struct rule *rule_chain, char* src_iface, char* dst_iface, u_char* saddr, u_char* dadder){
+    struct rule* r = rule_chain;
+    char any[] = "any";
+    if((strcmp(any, r->src_iface)==0) || (strcmp(r->src_iface, src_iface)==0)){
+        if((strcmp(any, r->dst_iface)==0) || (strcmp(r->dst_iface, dst_iface)==0)){
+            if((strcmp(any, r->src_ip)==0) || (strcmp(r->src_ip, saddr)==0)){
+                if((strcmp(any, r->dst_ip)==0) || (strcmp(r->dst_ip, daddr)==0)){
+                    return 1;
+                }
+            }
+        }
+    }
+    return 0;
+}
+
+//Returns the matching rule for the firewall.
+// If there is no matching rule, return PASS as default.
+rule_type_t get_firewall_action(struct rule *rule_chain, char* src_iface, char* dst_iface, 
+        u_char* saddr, u_char* dadder, u_short* src_port, u_short* dst_port){
+    
+    struct rule* r = rule_chain; 
+    char any[] = "any";
+    while(r != NULL){
+        //if ICMP there won't be src or dst ports
+        if(dst_port != NULL and src_port !=NULL){
+            //compare source port
+            if((strcmp(any, r->src_port) ==0) || (strcmp(r->src_port, src_port)==0)){
+                //compare destination ports
+                if((strcmp(any, r->dst_port) ==0) || (strcmp(r->dst_port, dst_port)==0)){
+                    if (match(r, src_iface, dst_iface, saddr, daddr)==1){
+                        return r->rule_type
+                    }
+                }
+            }
+        }else{
+            if (match(r, src_iface, dst_iface, saddr, daddr)==1){
+                return r->rule_type
+            }
+        }
+        r = r->next;
+    }
+    return PASS;
+}
