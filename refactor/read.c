@@ -67,8 +67,13 @@ void process_packet_inject(struct interface* iface,const struct pcap_pkthdr *hdr
     struct ip_header *h_ip = (struct ip_header *) (data + offset);
     offset += (h_ip->ver_ihl & 0x0f) * 4;
 
-    u_char * data8 = (data + offset);
+    u_char* data8= malloc(sizeof(u_char)*8);
+    printf("OFFSET: %d\n",(h_ip->ver_ihl & 0x0f) * 4);
+    memcpy(data8, (u_char*)data+offset, 8); 
+    printf("TOTAL LEN:%d\n",ntohs(h_ip->tlen));
     print_ip_address(h_ip);
+    printf("POST TESTER:%d\n",ntohs(*(u_short*)(data+offset)));
+    printf("POST TESTER2:%d\n",ntohs(*(u_short*)data8));
 
 
     printf("\n\nProtocol Type: %d\n\n", h_ip->proto);

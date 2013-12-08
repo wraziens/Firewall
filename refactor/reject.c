@@ -7,8 +7,11 @@
  */
 u_short checksum(void* ip_hdr, int count){
     long sum = 0;
+    void* p = ip_hdr;
     while(count > 0){
-        sum+= *((u_short*) ip_hdr)++;
+        //sum+= *((u_short*) ip_hdr)++;
+        sum+=*(u_short*)p;
+        p+=2;
         count -= 2;
     }
 
@@ -29,7 +32,7 @@ void icmp_reject(struct interface *iface, struct ip_header* ip_hdr, struct eth_h
 
     //construct the ethernet header
     struct eth_header h_ether;
-    memcpy(h_ether.dest,eth_hdr->src,sizeof(eth_hdr->src));
+    memcpy(h_ether.dest,eth_hdr->src, 6);
     //obtain the source mac address
     int s;
     struct ifreq buffer, buffer2;
@@ -62,34 +65,35 @@ void icmp_reject(struct interface *iface, struct ip_header* ip_hdr, struct eth_h
 
     memcpy(total_pack, &icmp_hdr, sizeof(struct icmp_header));
     memcpy(total_pack+sizeof(struct icmp_header), ip_hdr, ip_len);
-    memcpy(total_pack+sizeof(struct icmp_header)+ip_len, data8, 8);
+    
+    printf("POST TESTER22:%d\n",ntohs(*(u_short*)data8));
+    memcpy(total_pack+sizeof(struct icmp_header)+ip_len, *data8, 8);
 
     u_short crc = checksum((void*)&icmp_hdr, sizeof(struct icmp_header) + ip_len + 8);
-    //icmp_hdr.checksum = htons(crc);
-
+    icmp_hdr.checksum = crc;
 
     //construct the IP header
     struct ip_header h_ip;
     h_ip.proto=htons(ICMP_PROTO_ID);
-    memcpy(h_ip.ver_ihl,ip_hdr->ver_ihl, sizeof(ip_hdr->ver_ihl));
-    h_ip.proto = htons(0x01);
-    h_ip.crc = htons(0);
-    memcpy(h_ip.saddr, ip_hdr->daddr, 4);
-    memcpy(h_ip.daddr, ip_hdr->saddr, 4);
-    
-    u_short cksum = checksum(&h_ip, h_ip.tlen);
-    printf("Checksum: %i\n", cksum);
-    h_ip.crc = htons(cksum);
+    h_ip.ver_ihl=4<<4 & 5;
+    h_ip.tos = 0;
+    h_ip.tlen = sizeof(struct icmp_header) + ip_len+8 + 20;
+    h_ip.identification = 0;
+    h_ip.flags_fo = 0;
+    h_ip.ttl = 32;
+    h_ip.proto = ICMP_PROTO_ID;
+    h_ip.crc = 0;
+    memcpy(&h_ip.saddr, ip_hdr->daddr, 4);
+    memcpy(&h_ip.daddr, ip_hdr->saddr,4);
 
-    printf("Print the IPs of our constructed Packet\n");
-    print_ip_address(&h_ip);
-   
-    
+    h_ip.crc = checksum((void*)&h_ip,20);
+
     //combine the ICMP, IP, and Ethernet headers
-    u_char *packet = malloc(sizeof(struct eth_header)+sizeof(struct icmp_header) + sizeof(struct ip_header));
+    u_char *packet = malloc(sizeof(struct eth_header)+sizeof(struct icmp_header) + sizeof(struct ip_header) + ip_len +8); 
     memcpy(packet, eth_hdr, sizeof(struct eth_header));
-    memcpy(packet+sizeof(struct eth_header), &ip_hdr, sizeof(struct ip_header));
-    memcpy(packet+sizeof(struct ip_header), &icmp_hdr, sizeof(struct icmp_header));
+
+    memcpy(packet+sizeof(struct eth_header), &total_pack, sizeof(struct ip_header) + ip_len +8);
+    memcpy(packet+sizeof(struct ip_header)+ip_len +8 , &icmp_hdr, sizeof(struct icmp_header));
     //close(s);
 
     //send the packet over the wire.
