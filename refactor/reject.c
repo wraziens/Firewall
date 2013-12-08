@@ -67,7 +67,7 @@ void icmp_reject(struct interface *iface, struct ip_header* ip_hdr, struct eth_h
     memcpy(total_pack+sizeof(struct icmp_header), ip_hdr, ip_len);
     
     printf("POST TESTER22:%d\n",ntohs(*(u_short*)data8));
-    memcpy(total_pack+sizeof(struct icmp_header)+ip_len, *data8, 8);
+    memcpy(total_pack+sizeof(struct icmp_header)+ip_len, (void*)data8, 8);
 
     u_short crc = checksum((void*)&icmp_hdr, sizeof(struct icmp_header) + ip_len + 8);
     icmp_hdr.checksum = crc;
