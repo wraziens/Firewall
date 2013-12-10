@@ -16,6 +16,7 @@
 #include <arpa/inet.h>
 #include <string.h>
 #include "packets.h"
+#include "file_handle.h"
 
 void icmp_reject(struct interface *iface, struct ip_header* ip_hdr, u_char *data8, struct eth_header* eth_hdr);
 

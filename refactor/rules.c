@@ -118,9 +118,9 @@ void print_all_rules(struct rule *rule_chain){
 int match(struct rule *rule_chain, char* src_iface, char* dst_iface, u_char* saddr, u_char* daddr){
     struct rule* r = rule_chain;
     char any[] = "any";
-    if((strcmp(any, r->src_iface)==0) || (strcmp(r->src_iface, src_iface)==0)){
+    if((src_iface == NULL) || (strcmp(any, r->src_iface)==0) || (strcmp(r->src_iface, src_iface)==0)){
         printf("src interfaces match!\n");
-        if((strcmp(any, r->dst_iface)==0) || (strcmp(r->dst_iface, dst_iface)==0)){
+        if((dst_iface ==NULL) || (strcmp(any, r->dst_iface)==0) || (strcmp(r->dst_iface, dst_iface)==0)){
             printf("dst interfaces match!\n");
             if((strcmp(any, r->src_ip)==0) || (strcmp(r->src_ip, saddr)==0)){
                 printf("src ips match!\n");
@@ -145,7 +145,7 @@ rule_type_t get_firewall_action(struct rule *rule_chain, char* src_iface, char* 
     struct rule* r = rule_chain; 
     const char* any = "any";
     while(r != NULL){
-        print_rules(r);
+        //print_rules(r);
         printf("\n\n");
         //if ICMP there won't be src or dst ports
         if(dst_port != NULL && src_port !=NULL){

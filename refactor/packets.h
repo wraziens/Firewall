@@ -125,9 +125,11 @@ struct interfaces_map {
 
 void print_ip_address(struct ip_header* h_ip);
 
-char* ip_string(char* ip_addr);
+char* ip_string(u_char* ip_addr);
 
 int ip_in_subnet(u_char* ip, u_char* subnet, u_char* base_addr);
+
+char* port_string(u_short prt);
 
 /*GLOBAL VARIABLE DECLARATIONS*/
 

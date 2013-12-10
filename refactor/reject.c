@@ -3,7 +3,7 @@
 
 //Similar to http://tools.ietf.org/html/rfc1071
 /*
- * Computer Checksum for count bytes beggining at location ip_hdr
+ * Compute Checksum for count bytes beginning at location ip_hdr
  */
 u_short checksum(void* ip_hdr, int count){
     long sum = 0;
@@ -35,24 +35,27 @@ void icmp_reject(struct interface *iface, struct ip_header* ip_hdr, u_char *data
     //construct the ethernet header
     struct eth_header h_ether;
     memcpy(h_ether.dest,eth_hdr->src, 6);
-    //obtain the source mac address
-    int s;
-    struct ifreq buffer, buffer2;
-    s = socket(PF_INET, SOCK_DGRAM, 0);
-    strcpy(buffer.ifr_name, iface->name);
-    ioctl(s, SIOCGIFHWADDR, &buffer);
+    if(live ==1){
+        //obtain the source mac address
+        int s;
+        struct ifreq buffer, buffer2;
+        s = socket(PF_INET, SOCK_DGRAM, 0);
+        strcpy(buffer.ifr_name, iface->name);
+        ioctl(s, SIOCGIFHWADDR, &buffer);
 
-    for (int j=0; j< 6; j++){
-        printf("%.2X", (u_char)buffer.ifr_hwaddr.sa_data[j]);
+        for (int j=0; j< 6; j++){
+            printf("%.2X", (u_char)buffer.ifr_hwaddr.sa_data[j]);
+        }
+        printf("\n");
+        memcpy(h_ether.src, buffer.ifr_hwaddr.sa_data, sizeof(buffer.ifr_hwaddr.sa_data));
+        h_ether.type=htons(0x08000);
+        for (int j=0; j< 6; j++){
+            printf("%.2X", (u_char)h_ether.src[j]);
+        }
+        printf("\n");
+    }else{
+        memcpy(&h_ether.src, eth_hdr->dest, sizeof(u_char) *6); 
     }
-    printf("\n");
-    memcpy(h_ether.src, buffer.ifr_hwaddr.sa_data, sizeof(buffer.ifr_hwaddr.sa_data));
-    h_ether.type=htons(0x08000);
-    for (int j=0; j< 6; j++){
-        printf("%.2X", (u_char)h_ether.src[j]);
-    }
-    printf("\n");
- 
     //construct the ICMP header
     struct icmp_header icmp_hdr;
     icmp_hdr.type = 3;
@@ -102,9 +105,19 @@ void icmp_reject(struct interface *iface, struct ip_header* ip_hdr, u_char *data
     memcpy(packet+sizeof(struct eth_header) +sizeof(struct ip_header), total_pack, sizeof(struct icmp_header) + ip_len+8);
     //close(s);
 
-    //send the packet over the wire
-    if(pcap_inject(iface->pcap, packet, sizeof(struct eth_header)+sizeof(struct ip_header)+ip_len + 8 + sizeof(struct icmp_header))==-1){
+    if(live==1){
+        //send the packet over the wire
+        if(pcap_inject(iface->pcap, packet, sizeof(struct eth_header)+sizeof(struct ip_header)+ip_len + 8 + sizeof(struct icmp_header))==-1){
         pcap_perror(iface->pcap, 0);
+        }
+    //Replaying a file so write to a file.
+    }else{
+        int size = sizeof(struct eth_header) + sizeof(struct ip_header) + sizeof(struct icmp_header) + ip_len + 8;
+        struct pcap_pkthdr hdr;
+        hdr.caplen = size;
+        hdr.len = size;
+
+        process_packet_dump(&hdr,packet);
     }
     //Free memory
     free(total_pack);
@@ -117,24 +130,27 @@ void tcp_reset(struct interface *iface, struct ip_header* ip_hdr, struct tcp_hea
     //construct the ethernet header
     struct eth_header h_ether;
     memcpy(h_ether.dest,eth_hdr->src, 6);
-    //obtain the source mac address
-    int s;
-    struct ifreq buffer, buffer2;
-    s = socket(PF_INET, SOCK_DGRAM, 0);
-    strcpy(buffer.ifr_name, iface->name);
-    ioctl(s, SIOCGIFHWADDR, &buffer);
+    if (live ==1 ){
+        //obtain the source mac address
+        int s;
+        struct ifreq buffer, buffer2;
+        s = socket(PF_INET, SOCK_DGRAM, 0);
+        strcpy(buffer.ifr_name, iface->name);
+        ioctl(s, SIOCGIFHWADDR, &buffer);
 
-    for (int j=0; j< 6; j++){
-        printf("%.2X", (u_char)buffer.ifr_hwaddr.sa_data[j]);
+        for (int j=0; j< 6; j++){
+            printf("%.2X", (u_char)buffer.ifr_hwaddr.sa_data[j]);
+        }
+        printf("\n");
+        memcpy(h_ether.src, buffer.ifr_hwaddr.sa_data, sizeof(buffer.ifr_hwaddr.sa_data));
+        h_ether.type=htons(0x08000);
+        for (int j=0; j< 6; j++){
+            printf("%.2X", (u_char)h_ether.src[j]);
+        }
+        printf("\n");
+    }else{
+       memcpy(&h_ether.src, eth_hdr->dest, sizeof(u_char) * 6);
     }
-    printf("\n");
-    memcpy(h_ether.src, buffer.ifr_hwaddr.sa_data, sizeof(buffer.ifr_hwaddr.sa_data));
-    h_ether.type=htons(0x08000);
-    for (int j=0; j< 6; j++){
-        printf("%.2X", (u_char)h_ether.src[j]);
-    }
-    printf("\n");
- 
     //Construct the TCP header
     struct tcp_header tcp_h;
     printf("Porty port: %i\n", ntohs(tcp_hdr->dst_port));
@@ -172,11 +188,18 @@ void tcp_reset(struct interface *iface, struct ip_header* ip_hdr, struct tcp_hea
     memcpy(packet+sizeof(struct eth_header), &h_ip, sizeof(struct ip_header));
     memcpy(packet+sizeof(struct eth_header) +sizeof(struct ip_header), &tcp_h, sizeof(struct tcp_header));
 
-    printf("sending the packet over the wire..%s\n", iface->name);
-    
-    //send the packet over the wire
-    if(pcap_inject(iface->pcap, packet, sizeof(struct eth_header)+sizeof(struct ip_header)+sizeof(struct tcp_header))==-1){
-        pcap_perror(iface->pcap, 0);
+    if(live==1){ 
+        //send the packet over the wire
+        if(pcap_inject(iface->pcap, packet, sizeof(struct eth_header)+sizeof(struct ip_header)+sizeof(struct tcp_header))==-1){
+            pcap_perror(iface->pcap, 0);
+        }
+    }else{
+        int size = sizeof(struct eth_header) + sizeof(struct ip_header) + sizeof(struct tcp_header);
+        struct pcap_pkthdr hdr;
+        hdr.caplen = size;
+        hdr.len = size;
+
+        process_packet_dump(&hdr,packet);  
     }
 
     //Free memory

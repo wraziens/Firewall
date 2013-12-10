@@ -13,9 +13,14 @@ void print_ip_address(struct ip_header* h_ip){
             h_ip->daddr[3]);
 }
 
-char* ip_string(char* ip_addr){
+char* ip_string(u_char* ip_addr){
     char* buffer= malloc(sizeof(char) * 16);
     sprintf(buffer, "%d.%d.%d.%d", ip_addr[0],ip_addr[1], ip_addr[2], ip_addr[3]);
+    return buffer;
+}
+char* port_string(u_short prt){
+    char* buffer= malloc(sizeof(char) * 2);
+    sprintf(buffer, "%d",prt);
     return buffer;
 }
 
