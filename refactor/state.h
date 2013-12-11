@@ -22,7 +22,7 @@
 #include "rules.h"
 #include "arp.h"
 
-#define EXPIRE_STATE 1000
+#define EXPIRE_STATE 60
 
 //OPEN=SYN, HALF=SYNACK, ESTABLISHED=ACK
 //CLOSED=NOT in state table
@@ -37,7 +37,7 @@ struct state_node {
     u_short dst_prt;
     time_t time; //The last time this connection was active
     state_t state; //The current state of the node
-    char* ip_string; //The generated ip string
+    char ip_string[50]; //The generated ip string
     struct state_node* next;//The next state_node in the list
     struct state_node* prev;//the rpevious node in the list
 };
@@ -48,9 +48,9 @@ struct state_table {
     UT_hash_handle hh;
 };
 
-u_char* get_ip_key(u_char* src_ip, u_short src_prt, u_char* dst_ip, u_short dst_prt);
+char* get_ip_key(u_char* src_ip, u_short src_prt, u_char* dst_ip, u_short dst_prt);
 
-u_char* get_key(struct ip_header* h_ip, struct tcp_header* h_tcp);
+char* get_key(struct ip_header* h_ip, struct tcp_header* h_tcp);
 
 void append_to_list(struct state_node* sn);
 

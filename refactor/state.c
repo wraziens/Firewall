@@ -6,17 +6,17 @@
  *
  */
 
-u_char* get_key(struct ip_header* h_ip, struct tcp_header* h_tcp){
+char* get_key(struct ip_header* h_ip, struct tcp_header* h_tcp){
     return get_ip_key(h_ip->saddr, ntohs(h_tcp->src_port), h_ip->daddr, ntohs(h_tcp->dst_port));
 }
 
-u_char* get_ip_key(u_char* src_ip, u_short src_prt, u_char* dst_ip, u_short dst_prt){
+char* get_ip_key(u_char* src_ip, u_short src_prt, u_char* dst_ip, u_short dst_prt){
     char* src_i = ip_string(src_ip);
     char* dst_i = ip_string(dst_ip);
     char* src_pt = port_string(src_prt);
     char* dst_pt = port_string(dst_prt);
     
-    u_char* key=malloc(50);
+    char* key=(char*)malloc(sizeof(char) * 50);
 
     if(strcmp(src_i, dst_i) < 0){
         memcpy(key, src_i, strlen(src_i));
@@ -40,10 +40,10 @@ u_char* get_ip_key(u_char* src_ip, u_short src_prt, u_char* dst_ip, u_short dst_
         }
     }
     printf("strlen %i\n", strlen(key));
-    free(src_i);
-    free(dst_i);
-    free(src_pt);
-    free(dst_pt);
+    //free(src_i);
+    //free(dst_i);
+    //free(src_pt);
+    //free(dst_pt);
     return key;
 }
 
@@ -55,17 +55,17 @@ void append_to_list(struct state_node* sn){
     }else{
         printf("Adding to List\n");
         printf("%s\n", sn->ip_string);
-        printf("%s\n", first_state->ip_string);
-        printf("%s\n", last_state->ip_string);
-        last_state->next = sn;
+        //printf("%s\n", first_state->ip_string);
+        //printf("%s\n", last_state->ip_string);
         sn->prev = last_state;
+        last_state->next = sn;
         last_state = sn;
     }
 }
 
 void remove_from_list(struct state_node* sn){
     printf("REMOVE\n");
-    if(sn->prev != NULL && sn->next!=NULL){
+    if((sn->prev != NULL) && (sn->next!=NULL)){
         sn->prev->next = sn->next;
         sn->next->prev = sn->prev;
         sn->next = NULL;
@@ -73,21 +73,19 @@ void remove_from_list(struct state_node* sn){
         return;
     }
     if(sn->prev == NULL && sn->next == NULL){
-        if(last_state == sn){
-            last_state = NULL;
-        }
-        if(first_state == sn){
-            first_state = NULL;
-        }
+        last_state = NULL;
+        first_state = NULL;
         return;
     }
     if(sn->prev == NULL){
         first_state = sn->next;
+        sn->next->prev == NULL;
         sn->next = NULL;
         return;
     }
     if(sn->next == NULL){
         last_state = sn->prev;
+        sn->prev->next = NULL;
         sn->prev=NULL;
         return;
     }
@@ -110,10 +108,11 @@ void expunge_expired(){
 
     struct state_node* st = first_state;
     int stop = 0;
-    while((st != NULL) && (stop == 1)){
+    while((st != NULL) && (stop == 0)){
+        printf("removing expired node..");
         if(difftime(st->time, current) > EXPIRE_STATE){
             struct state_node* temp = st->next;
-            remove_from_list(st);
+            //remove_from_list(st);
             remove_from_hash(st->ip_string);
             delete_node(st);
             st = temp;
@@ -124,12 +123,15 @@ void expunge_expired(){
 }
 
 void add_to_hash(struct state_node* sn){
-
     struct state_table* st = (struct state_table*)malloc(sizeof(struct state_table));
-    strcpy(st->ip_string, sn->ip_string);
+
+    printf("ip->%s\n", sn->ip_string);
+    char* k =  get_ip_key(sn->src_ip, sn->src_prt, sn->dst_ip, sn->dst_prt);
+    //strcpy(sn->ip_string, sn->ip_string);
+    memcpy(st->ip_string, k, 50);
     st->node = sn;
     HASH_ADD_STR(state_tbl, ip_string, st);
-
+    //free(k);
 }
 
 void remove_from_hash(char* ip_str){
@@ -137,44 +139,57 @@ void remove_from_hash(char* ip_str){
     HASH_FIND_STR(state_tbl,ip_str, st);
     //if the ip string is in our state hash
     if(st){
+        remove_from_list(st->node);
         HASH_DEL(state_tbl, st);
-        free(st);
+        struct state_node* n = st->node;
+        st->node=NULL;
+        delete_node(n);
+        //free(st);
+        st=NULL;
     }
 }
 
 void delete_node(struct state_node* sn){
     printf("deleteing Node..\n");
-    free(sn->ip_string);
+    printf("ip_string %s\n.", sn->ip_string);
     free(sn);
 }
 
 void close_connection(char* ip_str){
+    remove_from_hash(ip_str);
+    /*
     struct state_table* st = NULL;
     HASH_FIND_STR(state_tbl,ip_str,st);
     //if the ip string is in our state hash
     if(st){
+        remove_from_list(st->node);
+        printf("close connection: %s\n", st->node->ip_string);
+        printf("key: %s\n", st->ip_string);
         HASH_DEL(state_tbl, st);
-        struct state_node* n = st->node;
-        remove_from_list(n);
-        delete_node(n);
-        free(st);
+        delete_node(st->node);
+        //free(st);
     }
+    */
 }
 
 void create_node(struct ip_header* h_ip, struct tcp_header* h_tcp){
     printf("Creating Node\n");
-    struct state_node* sn = malloc(sizeof(struct state_node));
+    struct state_node* sn = (struct state_node*)malloc(sizeof(struct state_node));
     memcpy(sn->src_ip, h_ip->saddr,4);
     sn->src_prt=h_tcp->src_port;
     memcpy(sn->dst_ip, h_ip->daddr,4);
     sn->dst_prt = h_tcp->dst_port;
     sn->time = time(NULL);
     sn->state = OPEN;
-    u_char* k = get_key(h_ip, h_tcp);
-    sn->ip_string = k;
+    char* k = get_key(h_ip, h_tcp);
+    strcpy(sn->ip_string,k);
+    printf("sn->ip_Strng: %s\n", sn->ip_string);
+    free(k);
+    printf("sn->ip_Strng: %s\n", sn->ip_string);
     //strcpy(sn->ip_string, k);
 
     add_to_hash(sn);
+    printf("Added to hash\n");
     append_to_list(sn);
 }
 
@@ -185,7 +200,7 @@ void create_node(struct ip_header* h_ip, struct tcp_header* h_tcp){
 rule_type_t process_with_state(char* iface1,char* iface2, struct ip_header* h_ip, struct tcp_header* h_tcp){
 
     print_ip_address(h_ip);
-    u_char* key = get_key(h_ip, h_tcp);
+    char* key = get_key(h_ip, h_tcp);
     //close the connection RST or FIN flag is set
     printf("Process:\n");
     if(h_tcp->flags & 0x01 || h_tcp->flags & 0x04){

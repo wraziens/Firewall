@@ -50,27 +50,21 @@ void pass_packet(struct interface* iface, struct ip_header* h_ip,u_char* data, s
 //By the Firewall
 void handle_tcp(struct eth_header* h_ether, struct ip_header* h_ip, struct tcp_header* h_tcp, struct interface* iface, const struct pcap_pkthdr *hdr, u_char* data){
 
+    expunge_expired();
     struct interface* i =NULL;
-    char* sadr = ip_string(h_ip->saddr);
-    char* dadr = ip_string(h_ip->daddr);
     rule_type_t rt;
     if(live ==1){
         i = get_interface(h_ip->daddr);
         //get the Rule that applies to this packet
         rt = process_with_state(iface->name, i->name, h_ip, h_tcp);
-        //get_firewall_action(rule_list,iface->name,i->name, sadr, dadr, ntohs(h_tcp->src_port), ntohs(h_tcp->dst_port));
+        
         //Free interface memory
         free(i);
     }else{
         rt = process_with_state(NULL, NULL, h_ip, h_tcp);
-        //rt = get_firewall_action(rule_list,NULL,NULL, sadr, dadr, ntohs(h_tcp->src_port), ntohs(h_tcp->dst_port));
     }
-    
-    //free memory no longer needed.
-    free(sadr);
-    free(dadr);
+    //rt = REJECT;
     printf("\n\nRule Type: %i\n", rt);
-    
     if(rt == REJECT){
         printf("TCP: Rejecting the Packet.\n"); 
         tcp_reset(iface, h_ip, h_tcp, h_ether);

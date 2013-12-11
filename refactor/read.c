@@ -30,7 +30,9 @@
 void process_packet_inject(struct interface* iface,const struct pcap_pkthdr *hdr, const u_char *data) {
     
     u_int offset = 0;
-
+    
+    //expunge_expired();
+    
     // Get the ethernet header which is the start of the array.
     struct eth_header *h_ether = malloc(sizeof(struct eth_header));
     memcpy(h_ether,(struct eth_header *) data, sizeof(struct eth_header));
