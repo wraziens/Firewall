@@ -36,6 +36,7 @@ void icmp_reject(struct interface *iface, struct ip_header* ip_hdr, u_char *data
     struct eth_header h_ether;
     memcpy(h_ether.dest,eth_hdr->src, 6);
     if(live ==1){
+        printf("Live File\n");
         //obtain the source mac address
         int s;
         struct ifreq buffer, buffer2;
@@ -54,8 +55,9 @@ void icmp_reject(struct interface *iface, struct ip_header* ip_hdr, u_char *data
         }
         printf("\n");
     }else{
-        memcpy(&h_ether.src, eth_hdr->dest, sizeof(u_char) *6); 
+        memcpy(&h_ether.dest, eth_hdr->src, sizeof(u_char) *6); 
     }
+    h_ether.type = eth_hdr->type;
     //construct the ICMP header
     struct icmp_header icmp_hdr;
     icmp_hdr.type = 3;
@@ -66,7 +68,6 @@ void icmp_reject(struct interface *iface, struct ip_header* ip_hdr, u_char *data
 
     int ip_len = (ip_hdr->ver_ihl & 0x0f) * 4;
 
-    printf("IPLEN: %i\n", ip_len);
     u_char* total_pack = malloc(sizeof(struct icmp_header) + ip_len + 8);
 
     memcpy(total_pack, &icmp_hdr, sizeof(struct icmp_header));
@@ -81,34 +82,49 @@ void icmp_reject(struct interface *iface, struct ip_header* ip_hdr, u_char *data
     //construct the IP header
     struct ip_header h_ip;
     h_ip.ver_ihl=(4<<4) + 5;
-    printf("LENGTH: %d\n", (h_ip.ver_ihl & 0x0f) *4); 
     h_ip.tos = 0;
     h_ip.flags_fo = 0;
     h_ip.tlen = htons(sizeof(struct icmp_header) + ip_len + 8 + 20);
-    printf("IP TLEN: %i", sizeof(struct icmp_header) + ip_len + 8 + 20);
     h_ip.identification = 0;
     h_ip.ttl = 32;
     h_ip.proto = ICMP_PROTO_ID;
     h_ip.crc = 0;
-    memcpy(h_ip.saddr, ip_hdr->daddr, 4);
+    //memcpy(h_ip.saddr, ip_hdr->daddr, 4);
     memcpy(h_ip.daddr, ip_hdr->saddr,4);
 
-    h_ip.crc = checksum((void*)&h_ip,20);
+    struct ifreq buffer2;
 
+    int s;
+    s = socket(AF_INET, SOCK_DGRAM, 0);
+    strcpy(buffer2.ifr_name, iface->name);
+
+    if(ioctl(s, SIOCGIFADDR, &buffer2)<0){
+        printf("Failing.");
+        return;
+        //exit(2);
+    }
+    //Copy the source ip into the header
+    struct sockaddr_in* src_ip_addr = (struct sockaddr_in *)&buffer2.ifr_addr;
+    memcpy(&h_ip.saddr, &src_ip_addr->sin_addr.s_addr, sizeof(char)*4);
+    
+    close(s);
+
+    h_ip.crc = checksum((void*)&h_ip,20);
 
     //combine the ICMP, IP, and Ethernet headers
     u_char *packet = malloc(sizeof(struct eth_header)+sizeof(struct icmp_header) + sizeof(struct ip_header) + ip_len +8); 
     
-    memcpy(packet, eth_hdr, sizeof(struct eth_header));
+    memcpy(packet, &h_ether, sizeof(struct eth_header));
 
     memcpy(packet+sizeof(struct eth_header), &h_ip, sizeof(struct ip_header));
     memcpy(packet+sizeof(struct eth_header) +sizeof(struct ip_header), total_pack, sizeof(struct icmp_header) + ip_len+8);
     //close(s);
 
     if(live==1){
+        printf("Sending the reject packet\n");
         //send the packet over the wire
         if(pcap_inject(iface->pcap, packet, sizeof(struct eth_header)+sizeof(struct ip_header)+ip_len + 8 + sizeof(struct icmp_header))==-1){
-        pcap_perror(iface->pcap, 0);
+            pcap_perror(iface->pcap, 0);
         }
     //Replaying a file so write to a file.
     }else{
@@ -151,9 +167,10 @@ void tcp_reset(struct interface *iface, struct ip_header* ip_hdr, struct tcp_hea
     }else{
        memcpy(&h_ether.src, eth_hdr->dest, sizeof(u_char) * 6);
     }
+    h_ether.type = eth_hdr->type;
+    
     //Construct the TCP header
     struct tcp_header tcp_h;
-    printf("Porty port: %i\n", ntohs(tcp_hdr->dst_port));
     tcp_h.src_port=tcp_hdr->dst_port;
     tcp_h.dst_port=tcp_hdr->src_port;
     tcp_h.window_size=tcp_hdr->window_size;
@@ -168,27 +185,43 @@ void tcp_reset(struct interface *iface, struct ip_header* ip_hdr, struct tcp_hea
     struct ip_header h_ip;
     h_ip.proto=TCP_PROTO_ID;
     h_ip.ver_ihl=(4<<4) + 5;
-    printf("LENGTH: %d\n", (h_ip.ver_ihl & 0x0f) *4); 
     h_ip.tos = 0;
     h_ip.flags_fo = 0;
     h_ip.tlen = htons(sizeof(struct tcp_header) + 20);
     h_ip.identification = 0;
     h_ip.ttl = 32;
     h_ip.crc = 0;
-    memcpy(h_ip.saddr, ip_hdr->daddr, 4);
+    //memcpy(h_ip.saddr, ip_hdr->daddr, 4);
     memcpy(h_ip.daddr, ip_hdr->saddr,4);
 
+    struct ifreq buffer2;
+
+    int s;
+    s = socket(AF_INET, SOCK_DGRAM, 0);
+    strcpy(buffer2.ifr_name, iface->name);
+
+    if(ioctl(s, SIOCGIFADDR, &buffer2)<0){
+        printf("Failing.");
+        return;
+        //exit(2);
+    }
+    //Copy the source ip into the header
+    struct sockaddr_in* src_ip_addr = (struct sockaddr_in *)&buffer2.ifr_addr;
+    memcpy(&h_ip.saddr, &src_ip_addr->sin_addr.s_addr, sizeof(char)*4);
+    
+    close(s);
     h_ip.crc = checksum((void*)&h_ip,20);
 
     //combine the TCP, IP, and Ethernet headers
     u_char *packet = malloc(sizeof(struct eth_header)+sizeof(struct tcp_header) + sizeof(struct ip_header)); 
     
-    memcpy(packet, eth_hdr, sizeof(struct eth_header));
+    memcpy(packet, &h_ether, sizeof(struct eth_header));
 
     memcpy(packet+sizeof(struct eth_header), &h_ip, sizeof(struct ip_header));
     memcpy(packet+sizeof(struct eth_header) +sizeof(struct ip_header), &tcp_h, sizeof(struct tcp_header));
 
     if(live==1){ 
+        printf("sending the TCP reset packet.\n");
         //send the packet over the wire
         if(pcap_inject(iface->pcap, packet, sizeof(struct eth_header)+sizeof(struct ip_header)+sizeof(struct tcp_header))==-1){
             pcap_perror(iface->pcap, 0);

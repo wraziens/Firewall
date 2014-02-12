@@ -341,16 +341,6 @@ void send_packet(struct arp_entry* a_ent, u_char *data, const struct pcap_pkthdr
     //the packet appropriately.
     memcpy(&h_ether->dest, a_ent->dest_mac, sizeof(h_ether->dest));
     memcpy(data, h_ether, sizeof(struct eth_header)); 
-    
-    for (int j=0; j< 6; j++){
-        printf("%.2X", (u_char)a_ent->dest_mac[j]);
-    }
-    printf("\ncopied version\n");
-     for (int j=0; j< 6; j++){
-        printf("%.2X", (u_char)h_ether->dest[j]);
-    }
-     printf("\n*******\n");
-
 
     while(pcap_inject(a_ent->iface.pcap, data, hdr->caplen)==1){
         printf("Error, trying again..\n");

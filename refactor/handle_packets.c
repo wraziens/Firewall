@@ -70,21 +70,20 @@ void handle_tcp(struct eth_header* h_ether, struct ip_header* h_ip, struct tcp_h
         tcp_reset(iface, h_ip, h_tcp, h_ether);
         //Free the packets
         free(h_ether);
-        free(h_ip);
         free(h_tcp);
         return;
     }else if(rt == BLOCK){
         printf("TCP: Blocking the packet.\n");
         //Free the packets
         free(h_ether);
-        free(h_ip);
         free(h_tcp);
         return;
     }else if(rt == PASS){
         printf("TCP: Forwarding the packet.\n");
         pass_packet(iface, h_ip, data, hdr);
         //free the packets
-        free(h_ip);
+        //free(h_ip);
+        free(h_ether);
         free(h_tcp);
         //h_ip is freed in pass_packet when it is done being used.
         return;
@@ -121,15 +120,19 @@ void handle_udp(struct eth_header* h_ether, struct ip_header* h_ip, struct udp_h
         u_char* data8 = malloc(8);
         memcpy(data8, (u_char*)data+offset, 8); 
         icmp_reject(iface, h_ip, data8, h_ether);
+        free(h_udp);
+        free(h_ether);
         return;
     }else if(rt == BLOCK){
         printf("UDP: Blocking the packet.\n");
+        free(h_udp);
+        free(h_ether);
         return;
     }else if(rt==PASS){
         printf("UDP: Forwarding the packet.\n"); 
         pass_packet(iface, h_ip, data, hdr);
         //free the packets
-        free(h_ip);
+        free(h_ether);
         free(h_udp);
         //h_ip is freed in pass_packet when it is done being used.
         return;
@@ -165,18 +168,21 @@ void handle_icmp(struct eth_header* h_ether, struct ip_header* h_ip, struct icmp
         int offset = sizeof(struct eth_header) + (h_ip->ver_ihl & 0x0f) * 4;
         u_char* data8 = malloc(8);
         memcpy(data8, (u_char*)data+offset, 8); 
-
         icmp_reject(iface, h_ip, data8, h_ether);
+        free(h_ether);
+        free(h_icmp);
         return;
     }else if(rt == BLOCK){
         printf("ICMP: Blocking the packet.\n");
+        free(h_ether);
+        free(h_icmp);
         return;
     }else if(rt==PASS){
         printf("ICMP: Forwarding the packet.\n"); 
         pass_packet(iface, h_ip, data, hdr);
         //free the packets
-        free(h_ip);
         free(h_icmp);
+        free(h_ether);
         //h_ip is freed in pass_packet when it is done being used.
         return;
     }
