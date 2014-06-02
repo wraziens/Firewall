@@ -37,12 +37,19 @@ document.
 Files
 =======
 arp.c -  Handles the ARP table and packets
+
 file_handle.c - Handles reading and writing to a pcap file
+
 handle_packets.c - Handles UDP, TCP, and ICMP packets
+
 reject.c - Handles the reject packets
+
 rule.c - Handles the firewall rules
+
 state.c - Handles the state table
-read.c
+
+read.c - Main program
+
 -------------
 Header Files
 -------------
